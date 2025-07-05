@@ -218,7 +218,7 @@ def get_first_one_off_message():
         "⚠️ <b>IMPORTANT:</b> After clicking Continue, your public wallet address and private key will be generated and displayed directly within Telegram. "
         "Ensure you are in a private space or location before proceeding. Your private key is for your own use only, and it is crucial that you store it securely, "
         "as Bloom will not store or retrieve it for you.\n\n"
-        "By pressing <a href='https://t.me/SolanaBloomCryptoBot?start=continue'>Continue</a>, you confirm that you have read and agree to our "
+        "By pressing <a href='https://t.me/SolanaBloomCryptoBot'>Continue</a>, you confirm that you have read and agree to our "
         "<a href='https://tos.bloombot.app/'>Terms and Conditions</a> and "
         "<a href='https://tos.bloombot.app/'>Privacy Policy</a>. You also acknowledge the inherent risks involved in cryptocurrency trading and accept full responsibility for any outcomes relating to your use of Bloom.\n\n"
         "Please take a moment to review our terms before moving forward."
