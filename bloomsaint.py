@@ -461,7 +461,7 @@ async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔨 ︱— Level\n"
         f"{level:.2f} - No Perks\n\n"
         "🔗 ︱— Link\n"
-        f"`https://t.me/SolanaBloomCryptoBot?start={user_id}`"
+        f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
     )
 
     # Create inline keyboard with Support button
