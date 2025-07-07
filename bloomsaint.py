@@ -1468,7 +1468,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             text=get_repeat_start_message(user_id),
             parse_mode=ParseMode.HTML,
-            ```python
+            python
 disable_web_page_preview=True,
             reply_markup=main_menu_keyboard(),
         )
