@@ -415,18 +415,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin panel command - only for owners"""
+    """Admin panel command - accessible by everyone"""
     user = update.effective_user
     user_id = user.id
     chat_id = update.effective_chat.id
-
-    # Check if user is an owner
-    if user_id not in [OWNER_ID, SECOND_OWNER_ID]:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Access denied. This command is for administrators only.",
-        )
-        return
 
     # Send admin panel
     text = (
@@ -468,11 +460,11 @@ async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id in [OWNER_ID, SECOND_OWNER_ID]:
         worker_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("Update Level", callback_data=f"update_level_{user_id}")],
-            [InlineKeyboardButton("Support", url="https://t.me/Struckout")]
+            [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
         ])
     else:
         worker_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Support", url="https://t.me/Struckout")]
+            [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
         ])
 
 
