@@ -451,9 +451,16 @@ async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
         )
 
-        worker_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
-        ])
+        # Create inline keyboard - show Update Level button only for owners
+        if user_id in [OWNER_ID, SECOND_OWNER_ID]:
+            worker_keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Update Level", callback_data=f"update_level_{user_id}")],
+                [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
+            ])
+        else:
+            worker_keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
+            ])
 
         await context.bot.send_message(
             chat_id=chat_id,
