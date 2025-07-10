@@ -1427,7 +1427,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Handle Current Workers (only for owners)
     if data == "current_workers":
         if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-            # Load workers data
+            # Load workers data to count workers
             try:
                 with open('Workers.json', 'r') as f:
                     workers_data = json.load(f)
@@ -1437,42 +1437,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 workers_data = {"workers": {}, "referrals": {}}
 
             workers = workers_data.get("workers", {})
-
-            if not workers:
-                text = (
-                    "👥 <b>Workers Panel</b>\n\n"
-                    "No workers found.\n\n"
-                    f"🕒 Last updated: {current_time()}"
-                )
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("❌ Close", callback_data="close")]
-                ])
-            else:
-                text = "👥 <b>Workers Panel</b>\n\n"
-                keyboard_buttons = []
-
-                for worker_id, worker_info in workers.items():
-                    # Create custom link for each worker
-                    worker_name = worker_info.get("name", f"Worker {worker_id}")
-                    custom_link = f"https://t.me/SolanaBloomCryptoBot?start=worker_{worker_id}"
-
-                    text += f"🔹 <b>{worker_name}</b>\n"
-                    text += f"   ID: {worker_id}\n"
-                    text += f"   Link: <code>{custom_link}</code>\n\n"
-
-                    # Add button for each worker
-                    keyboard_buttons.append([
-                        InlineKeyboardButton(f"📋 {worker_name}", callback_data=f"worker_details_{worker_id}")
-                    ])
-
-                text += f"🕒 Last updated: {current_time()}"
-
-                # Add close button
-                keyboard_buttons.append([
-                    InlineKeyboardButton("❌ Close", callback_data="close")
-                ])
-
-                keyboard = InlineKeyboardMarkup(keyboard_buttons)
+            worker_count = len(workers)
+            
+            text = (
+                "👥 <b>Workers Panel</b>\n\n"
+                f"Total Workers: {worker_count}\n\n"
+                f"🕒 Last updated: {current_time()}"
+            )
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ Close", callback_data="close")]
+            ])
 
             await query.edit_message_text(
                 text=text,
