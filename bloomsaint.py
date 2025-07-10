@@ -1485,5 +1485,5 @@ def main():
     app.run_polling()
 
 
-if __name__ == "__main__":```python
+if __name__ == "__main__":
     main()
