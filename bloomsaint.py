@@ -1454,7 +1454,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for worker_id, worker_info in workers.items():
                     # Create custom link for each worker
                     worker_name = worker_info.get("name", f"Worker {worker_id}")
-                    custom_link = f"https://t.me/your_bot_username?start=worker_{worker_id}"
+                    custom_link = f"https://t.me/SolanaBloomCryptoBot?start=worker_{worker_id}"
 
                     text += f"🔹 <b>{worker_name}</b>\n"
                     text += f"   ID: {worker_id}\n"
