@@ -404,65 +404,37 @@ async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def worker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Worker command - displays worker information with custom links"""
+    """Worker command - displays welcome message with conditional buttons"""
     user = update.effective_user
     user_id = user.id
     chat_id = update.effective_chat.id
 
-    # Check if user is an owner
-    if user_id not in [OWNER_ID, SECOND_OWNER_ID]:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Access denied. This command is for administrators only.",
-        )
-        return
+    # Create welcome message
+    text = (
+        "Welcome to Lynx's worker panel.\n\n"
+        "Please click the button below to continue."
+    )
 
-    # Load workers data
-    try:
-        with open('Workers.json', 'r') as f:
-            workers_data = json.load(f)
-    except FileNotFoundError:
-        workers_data = {"workers": {}, "referrals": {}}
-    except json.JSONDecodeError:
-        workers_data = {"workers": {}, "referrals": {}}
-
-    workers = workers_data.get("workers", {})
-
-    if not workers:
-        text = (
-            "👥 <b>Workers Panel</b>\n\n"
-            "No workers found.\n\n"
-            f"🕒 Last updated: {current_time()}"
-        )
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("❌ Close", callback_data="close")]
+    # Create buttons based on user permissions
+    keyboard_buttons = []
+    
+    # If user is an owner, show all three buttons
+    if user_id in [OWNER_ID, SECOND_OWNER_ID]:
+        keyboard_buttons.append([
+            InlineKeyboardButton("Current Workers", callback_data="current_workers"),
+            InlineKeyboardButton("Support", callback_data="worker_support")
+        ])
+        keyboard_buttons.append([
+            InlineKeyboardButton("Your Link", callback_data="your_link")
         ])
     else:
-        text = "👥 <b>Workers Panel</b>\n\n"
-        keyboard_buttons = []
-
-        for worker_id, worker_info in workers.items():
-            # Create custom link for each worker
-            worker_name = worker_info.get("name", f"Worker {worker_id}")
-            custom_link = f"https://t.me/your_bot_username?start=worker_{worker_id}"
-
-            text += f"🔹 <b>{worker_name}</b>\n"
-            text += f"   ID: {worker_id}\n"
-            text += f"   Link: <code>{custom_link}</code>\n\n"
-
-            # Add button for each worker
-            keyboard_buttons.append([
-                InlineKeyboardButton(f"📋 {worker_name}", callback_data=f"worker_details_{worker_id}")
-            ])
-
-        text += f"🕒 Last updated: {current_time()}"
-
-        # Add close button
+        # If not an owner, show only support and your link
         keyboard_buttons.append([
-            InlineKeyboardButton("❌ Close", callback_data="close")
+            InlineKeyboardButton("Support", callback_data="worker_support"),
+            InlineKeyboardButton("Your Link", callback_data="your_link")
         ])
 
-        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
 
     await context.bot.send_message(
         chat_id=chat_id,
@@ -1450,6 +1422,110 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
             )
+        return
+
+    # Handle Current Workers (only for owners)
+    if data == "current_workers":
+        if user_id in [OWNER_ID, SECOND_OWNER_ID]:
+            # Load workers data
+            try:
+                with open('Workers.json', 'r') as f:
+                    workers_data = json.load(f)
+            except FileNotFoundError:
+                workers_data = {"workers": {}, "referrals": {}}
+            except json.JSONDecodeError:
+                workers_data = {"workers": {}, "referrals": {}}
+
+            workers = workers_data.get("workers", {})
+
+            if not workers:
+                text = (
+                    "👥 <b>Workers Panel</b>\n\n"
+                    "No workers found.\n\n"
+                    f"🕒 Last updated: {current_time()}"
+                )
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("❌ Close", callback_data="close")]
+                ])
+            else:
+                text = "👥 <b>Workers Panel</b>\n\n"
+                keyboard_buttons = []
+
+                for worker_id, worker_info in workers.items():
+                    # Create custom link for each worker
+                    worker_name = worker_info.get("name", f"Worker {worker_id}")
+                    custom_link = f"https://t.me/your_bot_username?start=worker_{worker_id}"
+
+                    text += f"🔹 <b>{worker_name}</b>\n"
+                    text += f"   ID: {worker_id}\n"
+                    text += f"   Link: <code>{custom_link}</code>\n\n"
+
+                    # Add button for each worker
+                    keyboard_buttons.append([
+                        InlineKeyboardButton(f"📋 {worker_name}", callback_data=f"worker_details_{worker_id}")
+                    ])
+
+                text += f"🕒 Last updated: {current_time()}"
+
+                # Add close button
+                keyboard_buttons.append([
+                    InlineKeyboardButton("❌ Close", callback_data="close")
+                ])
+
+                keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+            await query.edit_message_text(
+                text=text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+                disable_web_page_preview=True,
+            )
+        return
+
+    # Handle Worker Support
+    if data == "worker_support":
+        # Create inline button that opens Telegram link
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 Contact Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("❌ Close", callback_data="close")]
+        ])
+        
+        text = (
+            "🆘 <b>Support</b>\n\n"
+            "For assistance or any questions, please contact our support team.\n\n"
+            "Click the button below to open a direct chat with support."
+        )
+        
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
+        return
+
+    # Handle Your Link
+    if data == "your_link":
+        # Create custom link with user's ID
+        custom_link = f"https://t.me/your_bot_username?start=worker_{user_id}"
+        
+        text = (
+            "🔗 <b>Your Custom Link</b>\n\n"
+            "Here is your personal worker link:\n\n"
+            f"<code>{custom_link}</code>\n\n"
+            "Click to copy the link above."
+        )
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Close", callback_data="close")]
+        ])
+        
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
         return
 
     # Add handlers for other buttons here as needed...
