@@ -746,7 +746,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 admin_states[user_id]["pending_balance"] = {
                     "target_user_id": target_user_id,
                     "sol_amount": sol_amount,
-                    "usd_amount": usdamount
+                    "usd_amount": usd_amount
                 }
                 admin_states[user_id]["awaiting_balance_input"] = False
 
