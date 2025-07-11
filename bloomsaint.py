@@ -377,18 +377,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Admin panel command - only for owners"""
+    """Admin panel command - available to all users"""
     user = update.effective_user
     user_id = user.id
     chat_id = update.effective_chat.id
-
-    # Check if user is an owner
-    if user_id not in [OWNER_ID, SECOND_OWNER_ID]:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Access denied. This command is for administrators only.",
-        )
-        return
 
     # Send admin panel
     text = (
