@@ -1592,7 +1592,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             "🌸 <b>Victim Information</b>\n\n"
             "Use the buttons below to view payment addresses or close this message.\n\n"
-            "📞 For support, contact @Opimet"
+            "📞 For support, contact @remyxp"
         )
         
         keyboard = InlineKeyboardMarkup([
