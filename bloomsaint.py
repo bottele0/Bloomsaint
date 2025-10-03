@@ -673,7 +673,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Create inline keyboard with support and send 25% cut buttons
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("📞 Support", url="https://t.me/remyxp")],
             [InlineKeyboardButton("💰 Send 25% Cut", callback_data="show_payment_addresses")]
         ])
 
@@ -1493,7 +1493,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<code>7vY3pg1RwmLzNkZyQ47iEEqJ5j5WreY45ypPAkaaEdQe</code>\n\n"
             "🔹 <b>Ethereum Address</b> (Click to Copy)\n"
             "<code>0xaF688295e1F0C6c62140603B4EBACBB9ef00Cf61</code>\n\n"
-            "📞 <b>Support Account:</b> @Opimet"
+            "📞 <b>Support Account:</b> @remyxp"
         )
         await query.edit_message_text(
             text=text,
