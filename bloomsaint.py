@@ -1543,7 +1543,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "worker_support":
         # Create inline button that opens Telegram link
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Contact Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("📞 Contact Support", url="https://t.me/Remyxp")],
             [InlineKeyboardButton("❌ Close", callback_data="close")]
         ])
         
@@ -1596,7 +1596,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📞 Support", url="https://t.me/Opimet")],
+            [InlineKeyboardButton("📞 Support", url="https://t.me/Remyxp")],
             [InlineKeyboardButton("💰 Send 25% Cut", callback_data="show_payment_addresses")],
             [InlineKeyboardButton("❌ Close", callback_data="close")]
         ])
